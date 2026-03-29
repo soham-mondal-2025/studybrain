@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient';
+import logoImg from './assets/logo.png'; // Make sure the path to your logo is correct
 
 const Sidebar = ({ onNavigate, activePage, onLogout }) => {
   const [userEmail, setUserEmail] = useState('');
@@ -25,10 +26,14 @@ const Sidebar = ({ onNavigate, activePage, onLogout }) => {
 
   return (
     <div className="w-64 bg-white h-screen border-r border-gray-100 flex flex-col p-6 no-print">
-      {/* LOGO */}
+      {/* LOGO SECTION - REPLACED 'S' WITH BRAIN LOGO */}
       <div className="flex items-center gap-3 mb-10 px-2">
-        <div className="bg-indigo-600 w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-indigo-100">
-          S
+        <div className="bg-yellow-300 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100 p-1.5">
+          <img 
+            src={logoImg} 
+            alt="StudyBrain" 
+            className="w-full h-full object-contain" 
+          />
         </div>
         <span className="text-xl font-black text-gray-800 tracking-tight">StudyBrain</span>
       </div>
