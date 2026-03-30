@@ -106,52 +106,50 @@ const AITutor = () => {
   setIsSubmitting(true);
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Please log in first");
+    if (!user) throw new Error("Login required");
 
-    const percentage = quiz.length
-      ? Math.round((score / quiz.length) * 100)
-      : 0;
+    const percentage = Math.round((score / quiz.length) * 100);
+    const xpToAdd = percentage;
 
-    const xpToAdd = Math.round(percentage);
+    // ✅ SAVE TEST RESULT
+    await supabase.from('test_results').insert({
+      user_id: user.id,
+      topic: topic,
+      score: score,
+      total_marks: quiz.length
+    });
+    
 
-    // ✅ Fetch current XP (NO .single())
-    const { data, error: fetchError } = await supabase
+    // ✅ FETCH PROFILE
+    const { data } = await supabase
       .from('profiles')
       .select('xp')
       .eq('id', user.id);
 
-    if (fetchError) throw fetchError;
+    let currentXP = data?.[0]?.xp || 0;
 
-    let currentXP = 0;
-
-    if (data && data.length > 0) {
-      currentXP = data[0].xp || 0;
-    } else {
-      // ✅ If profile doesn't exist, create it
-      const { error: insertError } = await supabase
-        .from('profiles')
-        .insert({ id: user.id, xp: 0 });
-
-      if (insertError) throw insertError;
+    // ✅ CREATE PROFILE IF NOT EXISTS
+    if (!data || data.length === 0) {
+      await supabase.from('profiles').insert({
+        id: user.id,
+        xp: 0,
+        full_name: user.user_metadata?.full_name || "Student"
+      });
     }
 
-    const newXP = currentXP + xpToAdd;
-
-    // ✅ Update XP
-    const { error } = await supabase
+    // ✅ UPDATE XP
+    await supabase
       .from('profiles')
-      .update({ xp: newXP })
+      .update({ xp: currentXP + xpToAdd })
       .eq('id', user.id);
 
-    if (error) throw error;
-
-    alert(`Success! +${xpToAdd} XP added 🚀`);
+    alert(`🔥 Score Saved +${xpToAdd} XP`);
   } catch (err) {
-    alert("Submit failed: " + (err?.message || "Unknown error"));
+    alert(err.message);
   } finally {
     setIsSubmitting(false);
   }
-  };
+};
   const exportPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(20);
