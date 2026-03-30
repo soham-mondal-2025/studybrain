@@ -1,97 +1,221 @@
-import React from 'react';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
+import React, { useEffect, useState } from 'react';
+import { supabase } from './supabaseClient';
 import { Pie, Bar } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
+  CategoryScale,
+  LinearScale,
+  BarElement
+} from 'chart.js';
 
-// Registering Chart.js components
-ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
 
 const Analytics = () => {
-  // Data for the Subject Distribution Pie Chart
-  const pieData = {
-    labels: ['Math', 'Physics', 'Computer Science', 'English'],
-    datasets: [
-      {
-        label: 'Study Hours',
-        data: [12, 19, 15, 8],
-        backgroundColor: ['#4f46e5', '#818cf8', '#c7d2fe', '#e0e7ff'],
-        borderWidth: 1,
-      },
-    ],
+  const [pieData, setPieData] = useState(null);
+  const [barData, setBarData] = useState(null);
+  const [strength, setStrength] = useState("-");
+  const [weakness, setWeakness] = useState("-");
+  const [tasksDone, setTasksDone] = useState(0);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // ✅ SUBJECT DETECTION LOGIC
+  const getSubject = (topic = "") => {
+    const t = topic.toLowerCase();
+
+    if (t.includes("algebra") || t.includes("calculus") || t.includes("geometry") || t.includes("math"))
+      return "Mathematics";
+
+    if (t.includes("physics") || t.includes("motion") || t.includes("force") || t.includes("energy"))
+      return "Physics";
+
+    if (t.includes("chemistry") || t.includes("reaction") || t.includes("organic"))
+      return "Chemistry";
+
+    if (t.includes("code") || t.includes("program") || t.includes("computer") || t.includes("algorithm"))
+      return "Computer Science";
+
+    if (t.includes("english") || t.includes("grammar"))
+      return "English";
+
+    return "Other";
   };
 
-  // Data for Friend Comparison Bar Chart
-  const barData = {
-    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-    datasets: [
-      {
-        label: 'Soham (You)',
-        data: [75, 82, 88, 91],
-        backgroundColor: '#4f46e5',
-      },
-      {
-        label: 'Friend (Avg)',
-        data: [70, 78, 80, 85],
-        backgroundColor: '#94a3b8',
-      },
-    ],
+  const fetchData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: tests = [] } = await supabase
+        .from('test_results')
+        .select('*')
+        .eq('user_id', user.id);
+
+      const { data: tasks = [] } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('user_id', user.id);
+
+      // =========================
+      // ✅ PIE CHART (SUBJECTS)
+      // =========================
+      const subjectMap = {};
+
+      tests.forEach(t => {
+        const subject = getSubject(t.topic);
+        subjectMap[subject] = (subjectMap[subject] || 0) + 1;
+      });
+
+      if (Object.keys(subjectMap).length === 0) {
+        // Default empty state
+        setPieData({
+          labels: ["No Data"],
+          datasets: [{
+            data: [1],
+            backgroundColor: ["#e5e7eb"]
+          }]
+        });
+      } else {
+        setPieData({
+          labels: Object.keys(subjectMap),
+          datasets: [{
+            data: Object.values(subjectMap),
+            backgroundColor: [
+              "#4f46e5",
+              "#22c55e",
+              "#f59e0b",
+              "#ef4444",
+              "#3b82f6",
+              "#a855f7"
+            ]
+          }]
+        });
+      }
+
+      // =========================
+      // ✅ BAR CHART (LAST 5 TESTS)
+      // =========================
+      if (tests.length === 0) {
+        setBarData({
+          labels: ["T1", "T2", "T3"],
+          datasets: [{
+            label: "Score %",
+            data: [0, 0, 0],
+            backgroundColor: "#c7d2fe"
+          }]
+        });
+      } else {
+        const lastTests = tests.slice(-5);
+
+        setBarData({
+          labels: lastTests.map((_, i) => `T${i + 1}`),
+          datasets: [{
+            label: "Score %",
+            data: lastTests.map(t =>
+              Math.round((t.score / t.total_marks) * 100)
+            ),
+            backgroundColor: "#4f46e5"
+          }]
+        });
+      }
+
+      // =========================
+      // ✅ STRENGTH & WEAKNESS (BY SUBJECT)
+      // =========================
+      const subjectScores = {};
+
+      tests.forEach(t => {
+        const subject = getSubject(t.topic);
+
+        if (!subjectScores[subject]) {
+          subjectScores[subject] = { total: 0, count: 0 };
+        }
+
+        subjectScores[subject].total += (t.score / t.total_marks) * 100;
+        subjectScores[subject].count += 1;
+      });
+
+      let best = "-";
+      let worst = "-";
+      let max = -1;
+      let min = 101;
+
+      Object.keys(subjectScores).forEach(sub => {
+        const avg = subjectScores[sub].total / subjectScores[sub].count;
+
+        if (avg > max) {
+          max = avg;
+          best = sub;
+        }
+
+        if (avg < min) {
+          min = avg;
+          worst = sub;
+        }
+      });
+
+      setStrength(best);
+      setWeakness(worst);
+
+      // =========================
+      // ✅ TASK COMPLETION
+      // =========================
+      setTasksDone(tasks.filter(t => t.status === "Complete").length);
+
+    } catch (err) {
+      console.error("Analytics Error:", err);
+    }
   };
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* PIE CHART */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h3 className="font-bold text-gray-800 mb-4 text-center">Subject Distribution</h3>
-          <div className="h-64 flex justify-center">
-            <Pie data={pieData} />
+
+      {/* CHARTS */}
+      <div className="grid md:grid-cols-2 gap-6">
+
+        {/* PIE */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border">
+          <h3 className="font-bold mb-4 text-center">📚 Subject Distribution</h3>
+          <div className="h-64 flex justify-center items-center">
+            {pieData && <Pie data={pieData} />}
           </div>
         </div>
 
-        {/* BAR CHART */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h3 className="font-bold text-gray-800 mb-4 text-center">Score Comparison (vs Friends)</h3>
-          <div className="h-64 flex justify-center">
-            <Bar data={barData} options={{ maintainAspectRatio: false }} />
+        {/* BAR */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border">
+          <h3 className="font-bold mb-4 text-center">📊 Recent Performance</h3>
+          <div className="h-64 flex justify-center items-center">
+            {barData && <Bar data={barData} options={{ maintainAspectRatio: false }} />}
           </div>
         </div>
 
       </div>
 
-      {/* DETAILED SWOT TABLE */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-        <h3 className="font-bold text-gray-800 mb-4">Detailed SWOT Breakdown</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="p-4 bg-green-50 rounded-xl border border-green-200">
-            <p className="font-bold text-green-700">STRENGTHS</p>
-            <ul className="text-xs text-green-600 mt-2 list-disc ml-4">
-              <li>Consistent Daily Streak</li>
-              <li>High Accuracy in Math</li>
-            </ul>
-          </div>
-          <div className="p-4 bg-red-50 rounded-xl border border-red-200">
-            <p className="font-bold text-red-700">WEAKNESSES</p>
-            <ul className="text-xs text-red-600 mt-2 list-disc ml-4">
-              <li>Physics Lab Reports</li>
-              <li>Late Night Productivity</li>
-            </ul>
-          </div>
-          <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
-            <p className="font-bold text-blue-700">OPPORTUNITIES</p>
-            <ul className="text-xs text-blue-600 mt-2 list-disc ml-4">
-              <li>AI Peer Mock Tests</li>
-              <li>Morning Study Slots</li>
-            </ul>
-          </div>
-          <div className="p-4 bg-yellow-50 rounded-xl border border-yellow-200">
-            <p className="font-bold text-yellow-700">THREATS</p>
-            <ul className="text-xs text-yellow-600 mt-2 list-disc ml-4">
-              <li>Upcoming Semester Finals</li>
-              <li>Social Media Distraction</li>
-            </ul>
-          </div>
+      {/* STATS */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border grid md:grid-cols-3 gap-4 text-center">
+
+        <div className="p-4 bg-green-50 rounded-xl">
+          <p className="font-bold text-green-600">💪 Strength</p>
+          <p className="text-lg font-black text-green-800">{strength}</p>
         </div>
+
+        <div className="p-4 bg-red-50 rounded-xl">
+          <p className="font-bold text-red-600">⚠️ Weakness</p>
+          <p className="text-lg font-black text-red-800">{weakness}</p>
+        </div>
+
+        <div className="p-4 bg-indigo-50 rounded-xl">
+          <p className="font-bold text-indigo-600">✅ Tasks Completed</p>
+          <p className="text-lg font-black text-indigo-800">{tasksDone}</p>
+        </div>
+
       </div>
+
     </div>
   );
 };
