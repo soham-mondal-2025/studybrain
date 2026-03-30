@@ -1,7 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient';
 
+// ✅ Badge Function (ADD HERE)
+const getBadge = (xp) => {
+  if (xp >= 2000) return { name: "Legend 🐉", color: "text-purple-600" };
+  if (xp >= 1500) return { name: "Master 🧠", color: "text-red-500" };
+  if (xp >= 1000) return { name: "Pro 🚀", color: "text-indigo-600" };
+  if (xp >= 600) return { name: "Advanced ⚡", color: "text-blue-500" };
+  if (xp >= 300) return { name: "Intermediate 📘", color: "text-green-500" };
+  if (xp >= 100) return { name: "Learner 🌱", color: "text-yellow-500" };
+  return { name: "Beginner 🐣", color: "text-gray-400" };
+};
+
 const Social = () => {
+  
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,26 +57,49 @@ const Social = () => {
           <p className="text-center text-gray-400 py-10 italic">No students joined yet. Be the first!</p>
         ) : (
           <div className="space-y-4">
-            {users.map((user, index) => (
-              <div key={user.id} className="flex items-center justify-between p-4 rounded-2xl border border-gray-50 hover:border-indigo-100 hover:bg-indigo-50/30 transition-all">
-                <div className="flex items-center space-x-4">
-                  <span className={`font-black text-lg w-6 ${index === 0 ? 'text-yellow-500' : 'text-gray-300'}`}>
-                    #{index + 1}
-                  </span>
-                  <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center font-bold text-indigo-600 border-2 border-white shadow-sm">
-                    {user.full_name ? user.full_name.substring(0, 2).toUpperCase() : '??'}
+            {users.map((user, index) => {
+              const badge = getBadge(user.xp || 0); // ✅ get badge
+
+              return (
+                <div key={user.id} className="flex items-center justify-between p-4 rounded-2xl border border-gray-50 hover:border-indigo-100 hover:bg-indigo-50/30 transition-all">
+                  
+                  <div className="flex items-center space-x-4">
+                    <span className={`font-black text-lg w-6 ${index === 0 ? 'text-yellow-500' : 'text-gray-300'}`}>
+                      #{index + 1}
+                    </span>
+
+                    <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center font-bold text-indigo-600 border-2 border-white shadow-sm">
+                      {user.full_name ? user.full_name.substring(0, 2).toUpperCase() : '??'}
+                    </div>
+
+                    <div>
+                      {/* ✅ Name + badge together */}
+                      <p className="font-bold text-gray-800 flex items-center gap-2">
+                        {user.full_name || "New Student"}
+                        <span className={`text-xs ${badge.color}`}>
+                          {badge.name}
+                        </span>
+                      </p>
+
+                      {/* ✅ Badge shown below also */}
+                      <p className={`text-xs font-bold ${badge.color}`}>
+                        {badge.name}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-bold text-gray-800">{user.full_name || "New Student"}</p>
-                    <p className="text-xs text-gray-500 italic">Level 1 Scholar</p>
+
+                  <div className="text-right">
+                    <p className="font-black text-indigo-600 text-lg">
+                      {user.xp || 0} XP
+                    </p>
+                    <p className="text-xs text-orange-500 font-bold">
+                      {user.streak || 0} Day Streak 🔥
+                    </p>
                   </div>
+
                 </div>
-                <div className="text-right">
-                  <p className="font-black text-indigo-600 text-lg">{user.xp || 0} XP</p>
-                  <p className="text-xs text-orange-500 font-bold">{user.streak || 0} Day Streak 🔥</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
