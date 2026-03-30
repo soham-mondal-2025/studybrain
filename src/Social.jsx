@@ -11,11 +11,10 @@ const Social = () => {
 
   const fetchLeaderboard = async () => {
     setLoading(true);
-    // Fetching profiles sorted by highest average score
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
-      .order('average_score', { ascending: false });
+      .order('xp', { ascending: false });
 
     if (error) {
       console.error('Error fetching leaderboard:', error);
@@ -61,7 +60,7 @@ const Social = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-black text-indigo-600 text-lg">{user.average_score || 0}%</p>
+                  <p className="font-black text-indigo-600 text-lg">{user.xp || 0} XP</p>
                   <p className="text-xs text-orange-500 font-bold">{user.streak || 0} Day Streak 🔥</p>
                 </div>
               </div>
@@ -78,7 +77,6 @@ const Social = () => {
             Your uploaded PDFs and personal notes in "Tasks & Deadlines" remain 100% private to you.
           </p>
         </div>
-        {/* Decorative circle */}
         <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-indigo-500 rounded-full opacity-20"></div>
       </div>
     </div>
