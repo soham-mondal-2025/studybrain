@@ -25,49 +25,34 @@ const AITutor = () => {
   const [mode, setMode] = useState('chat');
   const [topic, setTopic] = useState('');
   const [numQuestions, setNumQuestions] = useState(5);
-  const [totalMarks, setTotalMarks] = useState(10);
+  const [totalMarks, setTotalMarks] = useState(10); // Added Marks
   const [timeLimit, setTimeLimit] = useState(30);
   const [difficulty, setDifficulty] = useState('medium');
   const [isSuggesting, setIsSuggesting] = useState(false);
   
   const [quiz, setQuiz] = useState([]);
-  const [userAnswers, setUserAnswers] = useState([]); 
+  const [userAnswers, setUserAnswers] = useState([]); // Track answers for PDF
   const [currentIdx, setCurrentIdx] = useState(0);
   const [loading, setLoading] = useState(false);
   const [score, setScore] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
 
+  // Timer logic
   useEffect(() => {
     if (quiz.length > 0 && !showResult && timeLeft > 0) {
       const timer = setTimeout(() => setTimeLeft(prev => prev - 1), 1000);
       return () => clearTimeout(timer);
     } else if (timeLeft === 0 && quiz.length > 0 && !showResult) {
-      handleAnswer(-1); 
+      handleAnswer(-1); // Auto-skip on timeout
     }
   }, [timeLeft, quiz, showResult]);
-
-  // FIX: Aggressive cleaning to prevent PDF "&&&&" encoding issues
-  const cleanMathText = (text) => {
-    if (!text) return "";
-    return text
-      .replace(/\$/g, '') 
-      .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1/$2)') 
-      .replace(/\\pi/g, 'pi') 
-      .replace(/\\int_([^{]+)\^([^{]+)/g, 'Integral from $1 to $2') 
-      .replace(/\\infty/g, 'infinity')
-      .replace(/\\sqrt\{([^}]+)\}/g, 'sqrt($1)')
-      .replace(/\\ln/g, 'ln')
-      .replace(/\\e\^/g, 'e^')
-      .replace(/\\cdot/g, '*')
-      .replace(/\{|}/g, '')
-      .replace(/[^\x00-\x7F]/g, ""); // Final safety: Remove non-ASCII
-  };
 
   const suggestTime = async () => {
     if (!topic.trim()) return alert("Please enter a topic first!");
     setIsSuggesting(true);
     try {
+      // Updated prompt to include Marks
       const prompt = `Analyze topic: "${topic}", Difficulty: ${difficulty}, Qs: ${numQuestions}, Total Marks: ${totalMarks}. Based on complexity, return ONLY the ideal seconds per question as an integer.`;
       const result = await model.generateContent(prompt);
       const suggestedSeconds = parseInt(result.response.text().trim());
@@ -80,7 +65,7 @@ const AITutor = () => {
     if (!topic.trim()) return alert("Enter a topic!");
     setLoading(true);
     try {
-      const prompt = `Generate ${numQuestions} MCQ for ${topic} (${difficulty}). Each question is worth ${totalMarks/numQuestions} marks. Return JSON array only with keys: question, options (array), correct (index 0-3). Ensure questions use clean LaTeX.`;
+      const prompt = `Generate ${numQuestions} MCQ for ${topic} (${difficulty}). Each question is worth ${totalMarks/numQuestions} marks. Return JSON array only with keys: question, options (array), correct (index 0-3).`;
       const result = await model.generateContent(prompt);
       const text = result.response.text().replace(/```json|```/g, "");
       const parsedQuiz = JSON.parse(text);
@@ -115,64 +100,24 @@ const AITutor = () => {
     }
   };
 
-  // FIX: Updated exportPDF to handle fonts and page breaks correctly
   const exportPDF = () => {
     const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
+    doc.setFontSize(20);
+    doc.text(`Quiz Results: ${topic}`, 20, 20);
+    doc.setFontSize(14);
+    doc.text(`Final Score: ${score} / ${quiz.length}`, 20, 30);
     
-    doc.setFillColor(79, 70, 229); 
-    doc.rect(0, 0, pageWidth, 40, 'F');
-    
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
-    doc.setFont("helvetica", "bold");
-    doc.text("Quiz Performance Report", 20, 25);
-    
-    doc.setTextColor(100, 116, 139);
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Topic: ${topic}`, 20, 50);
-    doc.text(`Final Score: ${score} / ${quiz.length}`, 20, 58);
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 66);
-    
-    doc.setDrawColor(226, 232, 240);
-    doc.line(20, 72, pageWidth - 20, 72);
-    
-    let yPos = 85;
-    
+    let yPos = 50;
     userAnswers.forEach((ans, i) => {
-      if (yPos > 260) { 
-        doc.addPage(); 
-        yPos = 20; 
-      }
-      
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(79, 70, 229);
-      doc.text(`Question ${i + 1}`, 20, yPos);
-      
-      doc.setTextColor(30, 41, 59);
-      doc.setFont("helvetica", "normal");
-      const cleanQ = cleanMathText(ans.question);
-      const splitQ = doc.splitTextToSize(cleanQ, pageWidth - 40);
-      doc.text(splitQ, 20, yPos + 7);
-      
-      yPos += (splitQ.length * 7) + 5;
-
-      doc.setFontSize(10);
-      if (ans.status) {
-        doc.setTextColor(16, 185, 129);
-        doc.text(`Your Answer: ${cleanMathText(ans.selected)} (Correct)`, 25, yPos);
-      } else {
-        doc.setTextColor(239, 68, 68);
-        doc.text(`Your Answer: ${cleanMathText(ans.selected)} (Incorrect)`, 25, yPos);
-        yPos += 6;
-        doc.setTextColor(71, 85, 105);
-        doc.text(`Correct Answer: ${cleanMathText(ans.correct)}`, 25, yPos);
-      }
-      yPos += 15; 
+      if (yPos > 270) { doc.addPage(); yPos = 20; }
+      doc.setFont(undefined, 'bold');
+      doc.text(`${i + 1}. ${ans.question.substring(0, 80)}...`, 20, yPos);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Your Answer: ${ans.selected}`, 25, yPos + 7);
+      doc.text(`Correct Answer: ${ans.correct}`, 25, yPos + 14);
+      yPos += 25;
     });
-    
-    doc.save(`${topic.replace(/\s+/g, '_')}_Results.pdf`);
+    doc.save(`${topic}_results.pdf`);
   };
 
   return (
