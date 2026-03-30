@@ -36,6 +36,7 @@ const AITutor = () => {
   const [loading, setLoading] = useState(false);
   const [score, setScore] = useState(0);
   const [showResult, setShowResult] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
 
   // Timer logic
@@ -89,7 +90,7 @@ const AITutor = () => {
       correct: quiz[currentIdx].options[correctIdx],
       status: isCorrect 
     }]);
-
+    
     if (isCorrect) setScore(prev => prev + 1);
     
     if (currentIdx < quiz.length - 1) {
@@ -99,7 +100,58 @@ const AITutor = () => {
       setShowResult(true);
     }
   };
+  const handleLeaderboardSubmit = async () => {
+  if (isSubmitting) return;
 
+  setIsSubmitting(true);
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Please log in first");
+
+    const percentage = quiz.length
+      ? Math.round((score / quiz.length) * 100)
+      : 0;
+
+    const xpToAdd = Math.round(percentage);
+
+    // ✅ Fetch current XP (NO .single())
+    const { data, error: fetchError } = await supabase
+      .from('profiles')
+      .select('xp')
+      .eq('id', user.id);
+
+    if (fetchError) throw fetchError;
+
+    let currentXP = 0;
+
+    if (data && data.length > 0) {
+      currentXP = data[0].xp || 0;
+    } else {
+      // ✅ If profile doesn't exist, create it
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert({ id: user.id, xp: 0 });
+
+      if (insertError) throw insertError;
+    }
+
+    const newXP = currentXP + xpToAdd;
+
+    // ✅ Update XP
+    const { error } = await supabase
+      .from('profiles')
+      .update({ xp: newXP })
+      .eq('id', user.id);
+
+    if (error) throw error;
+
+    alert(`Success! +${xpToAdd} XP added 🚀`);
+  } catch (err) {
+    alert("Submit failed: " + (err?.message || "Unknown error"));
+  } finally {
+    setIsSubmitting(false);
+  }
+  };
   const exportPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(20);
@@ -208,6 +260,10 @@ const AITutor = () => {
                   </div>
                   <div className="flex flex-col md:flex-row gap-4 justify-center">
                     <motion.button whileHover={{ scale: 1.05 }} onClick={() => {setQuiz([]); setShowResult(false);}} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black shadow-xl">Try Again</motion.button>
+                    {/* SUBMIT BUTTON */}
+                    <motion.button whileHover={{ scale: 1.05 }} onClick={handleLeaderboardSubmit} disabled={isSubmitting} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl disabled:opacity-50">
+                      {isSubmitting ? "Submitting..." : "🔥 Submit Score"}
+                    </motion.button>
                     <motion.button whileHover={{ scale: 1.05 }} onClick={exportPDF} className="bg-emerald-500 text-white px-8 py-4 rounded-2xl font-black shadow-xl">📄 Export PDF</motion.button>
                   </div>
                 </motion.div>
